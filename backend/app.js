@@ -4,6 +4,7 @@ import morgan from "morgan";
 import helmet from "helmet";
 import { fileURLToPath } from "url";
 import path from "path";
+import githubRoutes from "./routes/github.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,6 +20,7 @@ export function createApp() {
   app.use(express.urlencoded({ extended: true }));
 
   // API Endpoints
+  app.use("/api/github", githubRoutes);
 
   // Health check
   app.get("/api/health", (req, res) => {
@@ -36,8 +38,10 @@ export function createApp() {
       version: "1.0.0",
       endpoints: {
         health: "/api/health",
-        github: "/api/github (coming soon)",
-        metrics: "/metrics (coming soon)",
+        githubUser: "/api/github/user/:username",
+        githubEvents: "/api/github/events/:username",
+        githubRepos: "/api/github/repos/:username",
+        rateLimit: "/api/github/rate-limit",
       },
     });
   });
