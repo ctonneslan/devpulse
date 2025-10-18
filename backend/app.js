@@ -5,6 +5,7 @@ import helmet from "helmet";
 import { fileURLToPath } from "url";
 import path from "path";
 import githubRoutes from "./routes/github.js";
+import syncRoutes from "./routes/sync.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,6 +22,7 @@ export function createApp() {
 
   // API Endpoints
   app.use("/api/github", githubRoutes);
+  app.use("/api/sync", syncRoutes);
 
   // Health check
   app.get("/api/health", (req, res) => {
@@ -42,6 +44,11 @@ export function createApp() {
         githubEvents: "/api/github/events/:username",
         githubRepos: "/api/github/repos/:username",
         rateLimit: "/api/github/rate-limit",
+        syncProfile: "POST /api/sync/profile/:username",
+        syncRepos: "POST /api/sync/repos/:username",
+        syncEvents: "POST /api/sync/events/:username",
+        syncComplete: "POST /api/sync/complete/:username",
+        stats: "/api/sync/stats",
       },
     });
   });

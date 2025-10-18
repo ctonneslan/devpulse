@@ -24,6 +24,7 @@ export async function getUserProfile(username) {
     const response = await githubClient.get(`/users/${username}`);
 
     return {
+      github_id: response.data.id,
       username: response.data.login,
       name: response.data.name,
       avatar_url: response.data.avatar_url,
