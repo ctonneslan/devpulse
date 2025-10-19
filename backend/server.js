@@ -1,3 +1,10 @@
+/**
+ * @fileoverview DevPulse API server entry point.
+ * Initializes the Express application, establishes database connection,
+ * and starts the HTTP server with graceful shutdown handlers.
+ * @module server
+ */
+
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -7,6 +14,21 @@ import { testConnection } from "./config/db.js";
 const app = createApp();
 const PORT = process.env.PORT || 3000;
 
+/**
+ * Starts the DevPulse API server with database connection and graceful shutdown handlers.
+ *
+ * @async
+ * @function startServer
+ * @throws {Error} If database connection fails or server cannot start
+ * @returns {Promise<void>}
+ *
+ * @description
+ * - Tests database connection before starting server
+ * - Starts HTTP server on configured PORT
+ * - Registers SIGTERM handler for graceful shutdown
+ * - Registers unhandledRejection handler to prevent crashes
+ * - Exits process if startup fails
+ */
 async function startServer() {
   try {
     await testConnection();

@@ -1,5 +1,20 @@
+/**
+ * @fileoverview Database service for managing PostgreSQL data operations.
+ * Provides CRUD operations for users, repositories, events, and sync logs.
+ * @module services/databaseService
+ */
+
 import pool from "../config/db.js";
 
+/**
+ * Retrieves a user from the database by username.
+ *
+ * @async
+ * @function getUserByUsername
+ * @param {string} username - GitHub username to search for
+ * @returns {Promise<Object|null>} User object if found, null otherwise
+ * @throws {Error} If database query fails
+ */
 export async function getUserByUsername(username) {
   try {
     const result = await pool.query("SELECT * FROM users WHERE username = $1", [
@@ -12,6 +27,29 @@ export async function getUserByUsername(username) {
   }
 }
 
+/**
+ * Inserts or updates a user in the database.
+ *
+ * @async
+ * @function upsertUser
+ * @param {Object} userData - User data to insert/update
+ * @param {string} userData.username - GitHub username
+ * @param {number} userData.github_id - GitHub user ID
+ * @param {string} userData.name - User's display name
+ * @param {string} userData.avatar_url - Avatar image URL
+ * @param {string} userData.bio - User biography
+ * @param {number} userData.public_repos - Number of public repositories
+ * @param {number} userData.followers - Number of followers
+ * @param {number} userData.following - Number of users being followed
+ * @param {string} userData.created_at - Account creation timestamp
+ * @param {string} userData.updated_at - Last update timestamp
+ * @returns {Promise<Object>} The inserted or updated user record
+ * @throws {Error} If database operation fails
+ *
+ * @description
+ * Uses ON CONFLICT to update existing records or insert new ones.
+ * Updates all fields except username and github_id on conflict.
+ */
 export async function upsertUser(userData) {
   try {
     const {
@@ -29,7 +67,7 @@ export async function upsertUser(userData) {
 
     const result = await pool.query(
       `
-        INSERT INTO users 
+        INSERT INTO users
         (username, github_id, name, avatar_url, bio, public_repos, followers, following, github_created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT (username)
@@ -63,6 +101,14 @@ export async function upsertUser(userData) {
   }
 }
 
+/**
+ * Retrieves all users from the database, ordered by creation date.
+ *
+ * @async
+ * @function getAllUsers
+ * @returns {Promise<Array<Object>>} Array of user objects
+ * @throws {Error} If database query fails
+ */
 export async function getAllUsers() {
   try {
     const result = await pool.query(
@@ -75,6 +121,31 @@ export async function getAllUsers() {
   }
 }
 
+/**
+ * Inserts or updates multiple repositories in the database in bulk.
+ *
+ * @async
+ * @function upsertRepositories
+ * @param {number} userId - Database ID of the user who owns these repositories
+ * @param {Array<Object>} repos - Array of repository objects to insert/update
+ * @param {number} repos[].id - GitHub repository ID
+ * @param {string} repos[].name - Repository name
+ * @param {string} repos[].full_name - Full repository name (owner/repo)
+ * @param {string} repos[].description - Repository description
+ * @param {string} repos[].language - Primary programming language
+ * @param {number} repos[].stargazers_count - Number of stars
+ * @param {number} repos[].forks_count - Number of forks
+ * @param {number} repos[].open_issues_count - Number of open issues
+ * @param {string} repos[].created_at - Repository creation timestamp
+ * @param {string} repos[].updated_at - Last update timestamp
+ * @returns {Promise<number>} Number of repositories affected
+ * @throws {Error} If database operation fails
+ *
+ * @description
+ * Performs bulk insert/update using a single query for efficiency.
+ * Uses ON CONFLICT to update existing repositories or insert new ones.
+ * Returns 0 if repos array is empty or null.
+ */
 export async function upsertRepositories(userId, repos) {
   if (!repos || repos.length === 0) {
     return 0;
@@ -112,8 +183,8 @@ export async function upsertRepositories(userId, repos) {
 
     const query = `
         INSERT INTO repositories (
-            github_id, user_id, name, full_name, description, 
-            language, stargazers_count, forks_count, 
+            github_id, user_id, name, full_name, description,
+            language, stargazers_count, forks_count,
             open_issues_count, github_created_at, github_updated_at
         ) VALUES ${placeholders.join(", ")}
          ON CONFLICT (github_id)
@@ -137,6 +208,16 @@ export async function upsertRepositories(userId, repos) {
   }
 }
 
+/**
+ * Retrieves repositories for a specific user.
+ *
+ * @async
+ * @function getRepositoriesByUserId
+ * @param {number} userId - Database ID of the user
+ * @param {number} [limit=30] - Maximum number of repositories to return
+ * @returns {Promise<Array<Object>>} Array of repository objects, ordered by most recently updated
+ * @throws {Error} If database query fails
+ */
 export async function getRepositoriesByUserId(userId, limit = 30) {
   try {
     const result = await pool.query(
@@ -154,6 +235,26 @@ export async function getRepositoriesByUserId(userId, limit = 30) {
   }
 }
 
+/**
+ * Inserts multiple events into the database in bulk.
+ *
+ * @async
+ * @function insertEvents
+ * @param {number} userId - Database ID of the user who generated these events
+ * @param {Array<Object>} events - Array of event objects to insert
+ * @param {string} events[].id - GitHub event ID
+ * @param {string} events[].type - Event type (e.g., PushEvent, IssueEvent)
+ * @param {string} events[].repo - Repository name
+ * @param {Object} events[].payload - Event payload data
+ * @param {string} events[].created_at - Event creation timestamp
+ * @returns {Promise<number>} Number of new events inserted (duplicates are ignored)
+ * @throws {Error} If database operation fails
+ *
+ * @description
+ * Performs bulk insert using a single query for efficiency.
+ * Uses ON CONFLICT DO NOTHING to skip duplicate events.
+ * Returns 0 if events array is empty or null.
+ */
 export async function insertEvents(userId, events) {
   if (!events || events.length === 0) {
     return 0;
@@ -197,6 +298,16 @@ export async function insertEvents(userId, events) {
   }
 }
 
+/**
+ * Retrieves events for a specific user.
+ *
+ * @async
+ * @function getEventsByUserId
+ * @param {number} userId - Database ID of the user
+ * @param {number} [limit=30] - Maximum number of events to return
+ * @returns {Promise<Array<Object>>} Array of event objects, ordered by most recent
+ * @throws {Error} If database query fails
+ */
 export async function getEventsByUserId(userId, limit = 30) {
   try {
     const result = await pool.query(
@@ -210,6 +321,18 @@ export async function getEventsByUserId(userId, limit = 30) {
   }
 }
 
+/**
+ * Retrieves event statistics grouped by event type for a user.
+ *
+ * @async
+ * @function getEventStatsByUserId
+ * @param {number} userId - Database ID of the user
+ * @returns {Promise<Object>} Object with event types as keys and counts as values
+ * @throws {Error} If database query fails
+ *
+ * @example
+ * // Returns: { "PushEvent": 42, "IssuesEvent": 15, "PullRequestEvent": 8 }
+ */
 export async function getEventStatsByUserId(userId) {
   try {
     const result = await pool.query(
@@ -234,6 +357,19 @@ export async function getEventStatsByUserId(userId) {
   }
 }
 
+/**
+ * Creates a new sync log entry.
+ *
+ * @async
+ * @function createSyncLog
+ * @param {number} userId - Database ID of the user
+ * @param {string} syncType - Type of sync operation (e.g., "profile", "repos", "events")
+ * @param {string} [status="started"] - Initial status of the sync
+ * @param {number} [recordsSynced=0] - Number of records synced (0 at start)
+ * @param {string|null} [errorMessage=null] - Error message if sync failed
+ * @returns {Promise<Object>} The created sync log record
+ * @throws {Error} If database operation fails
+ */
 export async function createSyncLog(
   userId,
   syncType,
@@ -257,6 +393,18 @@ export async function createSyncLog(
   }
 }
 
+/**
+ * Updates an existing sync log entry with completion information.
+ *
+ * @async
+ * @function updateSyncLog
+ * @param {number} syncLogId - ID of the sync log to update
+ * @param {string} status - Final status ("success" or "failed")
+ * @param {number} recordsSynced - Number of records successfully synced
+ * @param {string|null} [errorMessage=null] - Error message if sync failed
+ * @returns {Promise<void>}
+ * @throws {Error} If database operation fails
+ */
 export async function updateSyncLog(
   syncLogId,
   status,
@@ -280,6 +428,16 @@ export async function updateSyncLog(
   }
 }
 
+/**
+ * Retrieves sync logs for a specific user.
+ *
+ * @async
+ * @function getSyncLogsByUserId
+ * @param {number} userId - Database ID of the user
+ * @param {number} [limit=10] - Maximum number of sync logs to return
+ * @returns {Promise<Array<Object>>} Array of sync log objects, ordered by most recent
+ * @throws {Error} If database query fails
+ */
 export async function getSyncLogsByUserId(userId, limit = 10) {
   try {
     const result = await pool.query(
@@ -297,7 +455,19 @@ export async function getSyncLogsByUserId(userId, limit = 10) {
   }
 }
 
-export async function isDataStale(lastUpdated, maxAgeMinutes = 60) {
+/**
+ * Checks if cached data is stale and needs refreshing.
+ *
+ * @async
+ * @function isDataStale
+ * @param {string|Date} lastUpdated - Timestamp of last update
+ * @param {number} [maxAgeMinutes=60] - Maximum age in minutes before data is considered stale
+ * @returns {boolean} True if data is stale or lastUpdated is null/undefined, false otherwise
+ *
+ * @example
+ * const needsRefresh = isDataStale(user.updated_at, 30); // Check if older than 30 minutes
+ */
+export function isDataStale(lastUpdated, maxAgeMinutes = 60) {
   if (!lastUpdated) return true;
 
   const now = new Date();
@@ -307,6 +477,20 @@ export async function isDataStale(lastUpdated, maxAgeMinutes = 60) {
   return diffMinutes > maxAgeMinutes;
 }
 
+/**
+ * Retrieves overall database statistics.
+ *
+ * @async
+ * @function getDatabaseStatistics
+ * @returns {Promise<Object>} Statistics object
+ * @returns {number} return.totalUsers - Total number of users in database
+ * @returns {number} return.totalRepositories - Total number of repositories in database
+ * @returns {number} return.totalEvents - Total number of events in database
+ * @throws {Error} If database queries fail
+ *
+ * @description
+ * Executes three count queries in parallel for efficiency.
+ */
 export async function getDatabaseStatistics() {
   try {
     const [usersResult, reposResult, eventsResult] = await Promise.all([

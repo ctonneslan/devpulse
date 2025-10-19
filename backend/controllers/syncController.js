@@ -1,6 +1,30 @@
+/**
+ * @fileoverview Sync controller for managing data synchronization operations.
+ * Handles syncing GitHub data to the local database and retrieving sync statistics.
+ * @module controllers/syncController
+ */
+
 import * as syncService from "../services/syncService.js";
 import * as dbService from "../services/databaseService.js";
 
+/**
+ * Syncs a GitHub user profile to the local database.
+ *
+ * @async
+ * @function syncProfile
+ * @param {express.Request} req - Express request object
+ * @param {Object} req.params - URL parameters
+ * @param {string} req.params.username - GitHub username to sync
+ * @param {express.Response} res - Express response object
+ * @returns {Promise<void>}
+ *
+ * @description
+ * - Fetches user profile from GitHub API
+ * - Stores/updates user data in local database
+ * - Creates sync log entry
+ * - Returns 400 if username is missing
+ * - Returns 500 if sync fails
+ */
 export async function syncProfile(req, res) {
   const { username } = req.params;
   if (!username) {
@@ -22,6 +46,25 @@ export async function syncProfile(req, res) {
   }
 }
 
+/**
+ * Syncs a user's GitHub repositories to the local database.
+ *
+ * @async
+ * @function syncRepos
+ * @param {express.Request} req - Express request object
+ * @param {Object} req.params - URL parameters
+ * @param {string} req.params.username - GitHub username to sync repositories for
+ * @param {express.Response} res - Express response object
+ * @returns {Promise<void>}
+ *
+ * @description
+ * - Fetches repositories from GitHub API
+ * - Upserts repository data in local database
+ * - Creates sync log entry
+ * - Returns count of synced repositories
+ * - Returns 400 if username is missing
+ * - Returns 500 if sync fails
+ */
 export async function syncRepos(req, res) {
   const { username } = req.params;
   if (!username) {
@@ -43,6 +86,25 @@ export async function syncRepos(req, res) {
   }
 }
 
+/**
+ * Syncs a user's GitHub events/activity to the local database.
+ *
+ * @async
+ * @function syncEvents
+ * @param {express.Request} req - Express request object
+ * @param {Object} req.params - URL parameters
+ * @param {string} req.params.username - GitHub username to sync events for
+ * @param {express.Response} res - Express response object
+ * @returns {Promise<void>}
+ *
+ * @description
+ * - Fetches recent events from GitHub API
+ * - Inserts new events into local database
+ * - Creates sync log entry
+ * - Returns count of newly synced events
+ * - Returns 400 if username is missing
+ * - Returns 500 if sync fails
+ */
 export async function syncEvents(req, res) {
   const { username } = req.params;
   if (!username) {
@@ -64,6 +126,23 @@ export async function syncEvents(req, res) {
   }
 }
 
+/**
+ * Performs a complete sync of profile, repositories, and events.
+ *
+ * @async
+ * @function syncComplete
+ * @param {express.Request} req - Express request object
+ * @param {Object} req.params - URL parameters
+ * @param {string} req.params.username - GitHub username to perform complete sync for
+ * @param {express.Response} res - Express response object
+ * @returns {Promise<void>}
+ *
+ * @description
+ * - Syncs profile, repositories, and events in sequence
+ * - Returns aggregated results including counts
+ * - Returns 400 if username is missing
+ * - Returns 500 if any sync step fails
+ */
 export async function syncComplete(req, res) {
   const { username } = req.params;
   if (!username) {
@@ -85,6 +164,19 @@ export async function syncComplete(req, res) {
   }
 }
 
+/**
+ * Retrieves database statistics.
+ *
+ * @async
+ * @function getStats
+ * @param {express.Request} req - Express request object
+ * @param {express.Response} res - Express response object
+ * @returns {Promise<void>}
+ *
+ * @description
+ * - Returns total counts for users, repositories, and events in database
+ * - Returns 500 if retrieval fails
+ */
 export async function getStats(req, res) {
   try {
     const stats = await dbService.getDatabaseStatistics();

@@ -1,6 +1,28 @@
+/**
+ * @fileoverview Sync service for orchestrating GitHub data synchronization.
+ * Coordinates fetching data from GitHub API and storing it in the database
+ * with proper logging and error handling.
+ * @module services/syncService
+ */
+
 import * as githubService from "./githubService.js";
 import * as dbService from "./databaseService.js";
 
+/**
+ * Syncs a GitHub user's profile to the database.
+ *
+ * @async
+ * @function syncUserProfile
+ * @param {string} username - GitHub username to sync
+ * @returns {Promise<Object>} The synced user record from database
+ * @throws {Error} If GitHub API fails or database operation fails
+ *
+ * @description
+ * - Fetches user profile from GitHub API
+ * - Upserts user data into database
+ * - Creates sync log entry
+ * - On error, updates sync log with failure status
+ */
 export async function syncUserProfile(username) {
   let syncLog = null;
 
@@ -37,6 +59,22 @@ export async function syncUserProfile(username) {
   }
 }
 
+/**
+ * Syncs a GitHub user's repositories to the database.
+ *
+ * @async
+ * @function syncUserRepositories
+ * @param {string} username - GitHub username to sync repositories for
+ * @returns {Promise<number>} Number of repositories synced
+ * @throws {Error} If user not found in database, GitHub API fails, or database operation fails
+ *
+ * @description
+ * - Verifies user exists in database (requires profile sync first)
+ * - Creates sync log entry with "started" status
+ * - Fetches repositories from GitHub API
+ * - Upserts repositories into database
+ * - Updates sync log with success/failure status
+ */
 export async function syncUserRepositories(username) {
   let syncLog = null;
 
@@ -78,6 +116,22 @@ export async function syncUserRepositories(username) {
   }
 }
 
+/**
+ * Syncs a GitHub user's events/activity to the database.
+ *
+ * @async
+ * @function syncUserEvents
+ * @param {string} username - GitHub username to sync events for
+ * @returns {Promise<number>} Number of new events synced (duplicates are skipped)
+ * @throws {Error} If user not found in database, GitHub API fails, or database operation fails
+ *
+ * @description
+ * - Verifies user exists in database (requires profile sync first)
+ * - Creates sync log entry with "started" status
+ * - Fetches recent events from GitHub API
+ * - Inserts new events into database (skips duplicates)
+ * - Updates sync log with success/failure status
+ */
 export async function syncUserEvents(username) {
   let syncLog = null;
 
@@ -113,6 +167,26 @@ export async function syncUserEvents(username) {
   }
 }
 
+/**
+ * Performs a complete sync of user profile, repositories, and events.
+ *
+ * @async
+ * @function syncUserComplete
+ * @param {string} username - GitHub username to perform complete sync for
+ * @returns {Promise<Object>} Sync results
+ * @returns {Object} return.user - Synced user record
+ * @returns {number} return.reposCount - Number of repositories synced
+ * @returns {number} return.eventsCount - Number of events synced
+ * @throws {Error} If any sync operation fails
+ *
+ * @description
+ * Executes three sync operations in sequence:
+ * 1. Sync user profile (creates user if needed)
+ * 2. Sync repositories (requires user to exist)
+ * 3. Sync events (requires user to exist)
+ *
+ * Each operation creates its own sync log entry.
+ */
 export async function syncUserComplete(username) {
   console.log(`🔄 Starting complete sync for ${username}...`);
   try {
