@@ -11,6 +11,10 @@ dotenv.config();
 import { createApp } from "./app.js";
 import { testConnection } from "./config/db.js";
 import initDatabase from "./database/docker-init.js";
+import {
+  startMetricsUpdater,
+  stopMetricsUpdater,
+} from "./services/metricsUpdater.js";
 
 const app = createApp();
 const PORT = process.env.PORT || 3000;
@@ -42,11 +46,14 @@ async function startServer() {
       console.log(`🚀 DevPulse API running on http://localhost:${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV}`);
       console.log(`📈 Metrics: http://localhost:${PORT}/metrics`);
+
+      startMetricsUpdater(60); // Update every 60 seconds
     });
 
     // Graceful shutdown handlers
     process.on("SIGTERM", () => {
       console.log("SIGTERM received, shutting down gracefully");
+      stopMetricsUpdater();
       server.close(() => {
         console.log("Process terminated");
       });
