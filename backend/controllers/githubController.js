@@ -1,6 +1,7 @@
 import * as githubService from "../services/githubService.js";
 import * as dbService from "../services/databaseService.js";
 import * as syncService from "../services/syncService.js";
+import * as metricsService from "../services/metricsService.js";
 
 /**
  * Cache configuration for different data types (in minutes)
@@ -44,6 +45,7 @@ export async function getUser(req, res) {
       dbService.isDataStale(cachedUser.updated_at, CACHE_CONFIG.profile);
 
     if (needsRefresh) {
+      metricsService.recordCacheOperation("miss");
       console.log(`♻️ Refreshing profile for ${username} from GitHub...`);
       try {
         const user = await syncService.syncUserProfile(username);
@@ -56,6 +58,7 @@ export async function getUser(req, res) {
         });
       } catch (error) {
         if (cachedUser) {
+          metricsService.recordCacheOperation("stale");
           console.log(
             `⚠️ GitHub fetch failed, returning stale cache for ${username}`
           );
@@ -70,6 +73,7 @@ export async function getUser(req, res) {
         throw error;
       }
     }
+    metricsService.recordCacheOperation("hit");
     console.log(`✓ Serving ${username} profile from cache`);
     res.setHeader("X-Cache", "HIT");
     res.setHeader(
@@ -83,6 +87,7 @@ export async function getUser(req, res) {
       cached: true,
     });
   } catch (error) {
+    metricsService.recordError("controller");
     console.error("Error in getUser controller:", error.message);
     if (error.message.includes("not found")) {
       res.status(404).json({ error: error.message });
@@ -127,6 +132,7 @@ export async function getEvents(req, res) {
   try {
     const user = await dbService.getUserByUsername(username);
     if (!user) {
+      metricsService.recordCacheOperation("miss");
       console.log(`📥 User ${username} not found, syncing...`);
       await syncService.syncUserComplete(username);
       const newUser = await dbService.getUserByUsername(username);
@@ -146,6 +152,7 @@ export async function getEvents(req, res) {
       dbService.isDataStale(user.updated_at, CACHE_CONFIG.events);
 
     if (needsRefresh) {
+      metricsService.recordCacheOperation("miss");
       console.log(`♻️ Refreshing events for ${username}...`);
 
       try {
@@ -160,6 +167,7 @@ export async function getEvents(req, res) {
           cached: false,
         });
       } catch (error) {
+        metricsService.recordCacheOperation("stale");
         console.log(
           `⚠️ Refresh failed, returning cached events for ${username}`
         );
@@ -175,6 +183,7 @@ export async function getEvents(req, res) {
       }
     }
 
+    metricsService.recordCacheOperation("hit");
     console.log(`✓ Serving events for ${username} from cache...`);
     const events = await dbService.getEventsByUserId(user.id, limit);
     res.setHeader("X-Cache", "HIT");
@@ -185,6 +194,7 @@ export async function getEvents(req, res) {
       cached: true,
     });
   } catch (error) {
+    metricsService.recordError("controller");
     console.error("Error in getEvents controller:", error.message);
 
     if (error.message.includes("not found")) {
@@ -229,6 +239,7 @@ export async function getRepositories(req, res) {
   try {
     const user = await dbService.getUserByUsername(username);
     if (!user) {
+      metricsService.recordCacheOperation("miss");
       console.log(`📥 User ${username} not found, syncing...`);
       await syncService.syncUserComplete(username);
       const newUser = await dbService.getUserByUsername(username);
@@ -247,6 +258,7 @@ export async function getRepositories(req, res) {
       dbService.isDataStale(user.updated_at, CACHE_CONFIG.repos);
 
     if (needsRefresh) {
+      metricsService.recordCacheOperation("miss");
       console.log(`♻️ Refreshing repositories for ${username}...`);
       try {
         await syncService.syncUserRepositories(username);
@@ -260,6 +272,7 @@ export async function getRepositories(req, res) {
           cached: false,
         });
       } catch (error) {
+        metricsService.recordCacheOperation("stale");
         console.log(
           `⚠️ Refresh failed, returning cached repos for ${username}`
         );
@@ -275,6 +288,7 @@ export async function getRepositories(req, res) {
       }
     }
 
+    metricsService.recordCacheOperation("hit");
     console.log(`✓ Serving repositories for ${username} from cache`);
     const repos = await dbService.getRepositoriesByUserId(user.id, limit);
 
@@ -286,6 +300,7 @@ export async function getRepositories(req, res) {
       cached: true,
     });
   } catch (error) {
+    metricsService.recordError("controller");
     console.error("Error in getRepositories controller:", error.message);
     if (error.message.includes("not found")) {
       res.status(404).json({ error: error.message });
@@ -335,6 +350,7 @@ export async function getEventStats(req, res) {
       data: stats,
     });
   } catch (error) {
+    metricsService.recordError("controller");
     console.error("Error in getEventStats controller:", error.message);
     res.status(500).json({
       error: "Failed to fetch event statistics",
@@ -361,6 +377,7 @@ export async function checkRateLimit(req, res) {
       data: rateLimit,
     });
   } catch (error) {
+    metricsService.recordError("controller");
     console.error("Error checking rate limit:", error.message);
     res
       .status(500)

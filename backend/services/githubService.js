@@ -8,6 +8,7 @@
 import axios from "axios";
 import dotenv from "dotenv";
 dotenv.config();
+import * as metricsService from "./metricsService.js";
 
 /**
  * GitHub API base URL.
@@ -62,8 +63,13 @@ const githubClient = axios.create({
  * @throws {Error} If network error or other API error occurs
  */
 export async function getUserProfile(username) {
+  const startTime = Date.now();
+
   try {
     const response = await githubClient.get(`/users/${username}`);
+
+    const duration = (Date.now() - startTime) / 1000;
+    metricsService.recordGithubApiCall("/users/:username", "success", duration);
 
     return {
       github_id: response.data.id,
@@ -78,6 +84,10 @@ export async function getUserProfile(username) {
       updated_at: response.data.updated_at,
     };
   } catch (error) {
+    const duration = (Date.now() - startTime) / 1000;
+    metricsService.recordGithubApiCall("/users/:username", "failed", duration);
+    metricsService.recordError("github_api");
+
     if (error.response) {
       if (error.response.status === 404) {
         throw new Error(`Github user ${username} not found`);
@@ -111,12 +121,20 @@ export async function getUserProfile(username) {
  * @throws {Error} If network error or other API error occurs
  */
 export async function getUserEvents(username, perPage = 30) {
+  const startTime = Date.now();
   try {
     const response = await githubClient.get(`/users/${username}/events`, {
       params: {
         per_page: perPage,
       },
     });
+
+    const duration = (Date.now() - startTime) / 1000;
+    metricsService.recordGithubApiCall(
+      "/events/:username",
+      "success",
+      duration
+    );
 
     return response.data.map((event) => ({
       id: event.id,
@@ -126,6 +144,10 @@ export async function getUserEvents(username, perPage = 30) {
       payload: event.payload,
     }));
   } catch (error) {
+    const duration = (Date.now() - startTime) / 1000;
+    metricsService.recordGithubApiCall("/events/:username", "failed", duration);
+    metricsService.recordError("github_api");
+
     if (error.response) {
       if (error.response.status === 404) {
         throw new Error(`Github user ${username} not found`);
@@ -165,6 +187,7 @@ export async function getUserEvents(username, perPage = 30) {
  * @throws {Error} If network error or other API error occurs
  */
 export async function getUserRepositories(username, perPage = 30) {
+  const startTime = Date.now();
   try {
     const response = await githubClient.get(`/users/${username}/repos`, {
       params: {
@@ -173,6 +196,9 @@ export async function getUserRepositories(username, perPage = 30) {
         direction: "desc",
       },
     });
+
+    const duration = (Date.now() - startTime) / 1000;
+    metricsService.recordGithubApiCall("/repos/:username", "success", duration);
 
     return response.data.map((repo) => ({
       id: repo.id,
@@ -188,6 +214,10 @@ export async function getUserRepositories(username, perPage = 30) {
       pushed_at: repo.pushed_at,
     }));
   } catch (error) {
+    const duration = (Date.now() - startTime) / 1000;
+    metricsService.recordGithubApiCall("/repos/:username", "failed", duration);
+    metricsService.recordError("github_api");
+
     if (error.response) {
       if (error.response.status === 404) {
         throw new Error(`Github user ${username} not found`);
@@ -217,6 +247,8 @@ export async function getUserRepositories(username, perPage = 30) {
 export async function getRateLimit() {
   try {
     const response = await githubClient.get("/rate_limit");
+    const remaining = response.data.resources.core.remaining;
+    metricsService.updateGithubRateLimit(remaining);
     return {
       limit: response.data.resources.core.limit,
       remaining: response.data.resources.core.remaining,

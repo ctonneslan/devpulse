@@ -7,6 +7,7 @@
 
 import * as githubService from "./githubService.js";
 import * as dbService from "./databaseService.js";
+import * as metricsService from "./metricsService.js";
 
 /**
  * Syncs a GitHub user's profile to the database.
@@ -25,6 +26,7 @@ import * as dbService from "./databaseService.js";
  */
 export async function syncUserProfile(username) {
   let syncLog = null;
+  const startTime = Date.now();
 
   try {
     console.log(`📥 Fetching profile for ${username} from GitHub...`);
@@ -46,10 +48,17 @@ export async function syncUserProfile(username) {
 
     syncLog = await dbService.createSyncLog(user.id, "profile", "success", 1);
 
+    const duration = (Date.now() - startTime) / 1000;
+    metricsService.recordSyncDuration("profile", "success", duration);
+
     console.log(`✅ Profile synced for ${username}...`);
     return user;
   } catch (error) {
     console.error(`❌ Error syncing profile for ${username}:`, error.message);
+
+    const duration = (Date.now() - startTime) / 1000;
+    metricsService.recordSyncDuration("profile", "failed", duration);
+    metricsService.recordError("sync");
 
     if (syncLog) {
       await dbService.updateSyncLog(syncLog.id, "failed", 0, error.message);
@@ -77,6 +86,7 @@ export async function syncUserProfile(username) {
  */
 export async function syncUserRepositories(username) {
   let syncLog = null;
+  const startTime = Date.now();
 
   try {
     const user = await dbService.getUserByUsername(username);
@@ -100,6 +110,9 @@ export async function syncUserRepositories(username) {
     // Update sync log
     await dbService.updateSyncLog(syncLog.id, "success", syncedCount);
 
+    const duration = (Date.now() - startTime) / 1000;
+    metricsService.recordSyncDuration("repositories", "success", duration);
+
     console.log(`✅ Synced ${syncedCount} repositories for ${username}`);
     return syncedCount;
   } catch (error) {
@@ -107,6 +120,10 @@ export async function syncUserRepositories(username) {
       `❌ Error syncing repositories for ${username}:`,
       error.message
     );
+
+    const duration = (Date.now() - startTime) / 1000;
+    metricsService.recordSyncDuration("repositories", "failed", duration);
+    metricsService.recordError("sync");
 
     if (syncLog) {
       await dbService.updateSyncLog(syncLog.id, "failed", 0, error.message);
@@ -134,6 +151,7 @@ export async function syncUserRepositories(username) {
  */
 export async function syncUserEvents(username) {
   let syncLog = null;
+  const startTime = Date.now();
 
   try {
     const user = await dbService.getUserByUsername(username);
@@ -154,10 +172,17 @@ export async function syncUserEvents(username) {
     console.log(`💾 Storing ${events.length} events in database...`);
     const syncedCount = await dbService.insertEvents(user.id, events);
 
+    const duration = (Date.now() - startTime) / 1000;
+    metricsService.recordSyncDuration("events", "success", duration);
+
     console.log(`✅ Synced ${syncedCount} new events for ${username}`);
     return syncedCount;
   } catch (error) {
     console.error(`❌ Error syncing events for ${username}:`, error.message);
+
+    const duration = (Date.now() - startTime) / 1000;
+    metricsService.recordSyncDuration("events", "failed", duration);
+    metricsService.recordError("sync");
 
     if (syncLog) {
       await dbService.updateSyncLog(syncLog.id, "failed", 0, error.message);

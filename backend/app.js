@@ -13,6 +13,8 @@ import path from "path";
 import githubRoutes from "./routes/github.js";
 import syncRoutes from "./routes/sync.js";
 import cacheRoutes from "./routes/cache.js";
+import metricsRoutes from "./routes/metrics.js";
+import { metricsMiddleware } from "./middleware/metrics.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,11 +42,13 @@ export function createApp() {
   app.use(helmet());
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  app.use(metricsMiddleware);
 
-  // API Endpoints
+  // Routes
   app.use("/api/github", githubRoutes);
   app.use("/api/sync", syncRoutes);
   app.use("/api/cache", cacheRoutes);
+  app.use("/metrics", metricsRoutes);
 
   /**
    * GET /api/health
@@ -74,6 +78,8 @@ export function createApp() {
       version: "1.0.0",
       endpoints: {
         health: "GET /api/health",
+        metrics: "GET /metrics",
+        metricsJson: "GET /metrics/json",
         github: {
           user: "GET /api/github/user/:username",
           events: "GET /api/github/events/:username",
