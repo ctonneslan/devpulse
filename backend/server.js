@@ -10,6 +10,7 @@ dotenv.config();
 
 import { createApp } from "./app.js";
 import { testConnection } from "./config/db.js";
+import initDatabase from "./database/docker-init.js";
 
 const app = createApp();
 const PORT = process.env.PORT || 3000;
@@ -33,9 +34,14 @@ async function startServer() {
   try {
     await testConnection();
 
+    if (process.env.NODE_ENV === "production") {
+      await initDatabase();
+    }
+
     const server = app.listen(PORT, () => {
       console.log(`🚀 DevPulse API running on http://localhost:${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV}`);
+      console.log(`📈 Metrics: http://localhost:${PORT}/metrics`);
     });
 
     // Graceful shutdown handlers

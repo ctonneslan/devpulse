@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14-alpine
+    container_name: devpulse-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: devpulse_password
+      POSTGRES_DB: devpulse
+      POSTGRES_USER: devpulse_user
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devpulse_user -d devpulse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devpulse-network
+  
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: devpulse-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://devpulse_user:devpulse_password@postgres:5432/devpulse
+      DATABASE_SSL: "false"
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      JWT_SECRET: super_secret_change_in_production
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - devpulse-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: devpulse-prometheus
+    restart: unless-stopped
+    command:
+      # Config file location
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      # Where to store data
+      - '--storage.tsdb.path=/prometheus'
+      # How long to keep data (15 days)
+      - '--storage.tsdb.retention.time=15d'
+      # Enable admin API (for deleting data)
+      - '--web.enable-admin-api'
+    ports:
+      - "9090:9090"
+    volumes:
+      # Prometheus config
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # Persist metrics data
+      - prometheus_data:/prometheus
+    depends_on:
+      - api
+    networks:
+      - devpulse-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9090/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  prometheus_data:
+    driver: local
+
+networks:
+  devpulse-network:
+    driver: bridge
